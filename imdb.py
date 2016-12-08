@@ -90,6 +90,7 @@ def review_to_sentences( review_data, tokenizer):
 	#didn’t seem to work without it, thanks StackOverflow
 	#review = review.decode("utf-8")
 	#strip out whitespace at beginning and end
+	sentences_to_return = []
 	for row in review_data:
 		review = row.strip()
 		raw_sentences = tokenizer.tokenize(review)
@@ -98,20 +99,39 @@ def review_to_sentences( review_data, tokenizer):
 		for sentence in raw_sentences:
 			if len(sentence) > 0: #skip it if the sentence is empty
 				cl_sent = clean_sentence(sentence)
-				sentences_list +=(cl_sent)
-	return sentences_list
+				sentences_list += cl_sent
+		sentences_to_return.append(sentences_list)
+	return sentences_to_return
 
+def make_attribute_vec(words, model, num_attributes):
+	# Pre-initialize an empty numpy array (for speed)
+	attribute_vec = numpy.zeros((num_attributes,),dtype="float32")
+	nwords = 0.0
+	# Loop over each word in the review and, if it is in the model’s
+	# vocaublary, add its attribute vector to the total
+	for word in words:
+		if word in model.vocab:
+			nwords = nwords + 1.0
+			attribute_vec = numpy.add(attribute_vec,model[word])
+
+	# Divide the result by the number of words to get the average
+	attribute_vec = numpy.divide(attribute_vec,nwords)
+	return attribute_vec
 
 def deep_learning():
+	print("--- Tokenizing the data ---")
 	tokenizer = nltk.data.load("tokenizers/punkt/english.pickle")
 	data = pandas.read_csv("imdb_reviews.tsv", delimiter="\t")
 	sentences_for_all_reviews = review_to_sentences(data["review"],tokenizer) 
+
+	print("--- Training the data using Word2Vec ---")
 	num_attributes = 300 # Word vector dimensionality
 	min_word_count = 40 # Minimum word frequency
 	num_workers = 4 # Number of threads to run in parallel
 	context = 10 # Context window size
 	downsampling = 1e-3 # Downsample setting for frequent words
 	# Initialize and train the model (this will take some time)
+
 	model = word2vec.Word2Vec(sentences_for_all_reviews, \
 			workers=num_workers, size=num_attributes, \
 			min_count = min_word_count, \
@@ -119,23 +139,34 @@ def deep_learning():
 	#saves memory if you’re done training it
 	model.init_sims(replace=True)
 
+	print("--- Print results ---")
 	def fun_with_model():
-		model.vocab
-		"chicago" in model.vocab
-		"iowa" in model.vocab
-		model.similarity("england","france")
-		model.similarity("england","paris")
-		model.most_similar("king")
-		model.most_similar("awful")
-		model.doesnt_match(["man","woman","child","kitchen"])
-		model.doesnt_match(["france","england","germany","berlin"])
-		model["king"]
-		model["queen"]
-		model["man"]
-		model["woman"]
-		(model["king"] - model["man"] + model["woman"])
-		model.most_similar(positive=["woman", "king"], negative=["man"])
+		# model.vocab
+		# print("chicago" in model.vocab)
+		# print("iowa" in model.vocab)
+		# print(model.similarity("england","france"))
+		print(model.similarity("england","paris"))
+		# model.most_similar("king")
+		# model.most_similar("awful")
+		# model.doesnt_match(["man","woman","child","kitchen"])
+		# model.doesnt_match(["france","england","germany","berlin"])
+		# model["king"]
+		# model["queen"]
+		# model["man"]
+		# model["woman"]
+		# (model["king"] - model["man"] + model["woman"])
+		# model.most_similar(positive=["woman", "king"], negative=["man"])
 	fun_with_model()
+
+	def fun_with_attributes():
+		print("original: ",data["review"][0])
+		clean_review = clean_sentence(data["review"][0])
+		print("clean: ",clean_review)
+		review_vector = make_attribute_vec(clean_review, model, \
+				num_attributes)
+		print("vector: ",review_vector)
+	fun_with_attributes()
+
 #main()
 deep_learning()
 
